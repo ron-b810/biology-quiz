@@ -30,7 +30,7 @@ if 'score' not in st.session_state:
     st.session_state.score = 0
 
 # --- עיצוב האפליקציה ---
-st.set_page_config(page_title="Biology Exam", layout="centered", direction="rtl")
+st.set_page_config(page_title="Biology Exam", layout="centered")
 
 st.markdown("<h1 style='text-align: center; color: #4CAF50;'>מבחן תיאוריה בביולוגיה 🧬</h1>", unsafe_allow_html=True)
 
