@@ -35,7 +35,17 @@ if not st.session_state.quiz_started and not st.session_state.quiz_complete:
     num_q = st.selectbox("כמה שאלות תרצה במבחן?", valid_options)
 
     if st.button("התחל מבחן 🚀"):
-        st.session_state.selected_questions = random.sample(st.session_state.all_data, num_q)
+        # הגרלת שאלות
+        selected = random.sample(st.session_state.all_data, num_q)
+
+        # --- רנדומיזציה של התשובות לכל שאלה שנבחרה ---
+        for question in selected:
+            # אנחנו יוצרים עותק של הרשימה ומערבבים אותה
+            shuffled_options = list(question['options'])
+            random.shuffle(shuffled_options)
+            question['shuffled_options'] = shuffled_options
+
+        st.session_state.selected_questions = selected
         st.session_state.total_questions_limit = num_q
         st.session_state.current_display_idx = 1
         st.session_state.correct_count = 0
@@ -50,23 +60,23 @@ elif st.session_state.quiz_started:
 
     total_limit = st.session_state.total_questions_limit
     current_num = st.session_state.current_display_idx
-    original_id = q.get('id', '??')  # לוקח את מספר השאלה המקורי מה-JSON
+    original_id = q.get('id', '??')
 
-    # תצוגת מספר שאלה במבחן + מספר שאלה מקורי
     st.write(f"**שאלה {current_num} מתוך {total_limit}** (שאלה {original_id} במאגר)")
     st.progress(min(current_num / total_limit, 1.0))
 
     st.info(q.get('question', 'שאלה חסרה'))
 
-    # הצגת תמונה עם בדיקת נתיב לדיבאגינג
     if q.get('image'):
         image_path = q['image']
         if os.path.exists(image_path):
             st.image(image_path, use_container_width=True)
         else:
-            st.warning(f"⚠️ קובץ תמונה לא נמצא: {image_path} (וודא שהשם ב-JSON תואם לגיטהאב)")
+            st.warning(f"⚠️ קובץ תמונה לא נמצא: {image_path}")
 
-    user_choice = st.radio("בחר תשובה:", q.get('options', []), key=f"q_{current_num}", index=None)
+    # משתמשים באופציות המעורבבות שיצרנו בהתחלה
+    options_to_show = q.get('shuffled_options', q.get('options', []))
+    user_choice = st.radio("בחר תשובה:", options_to_show, key=f"q_{current_num}", index=None)
 
     col1, col2 = st.columns(2)
 
