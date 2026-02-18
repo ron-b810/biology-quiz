@@ -57,7 +57,15 @@ elif st.session_state.quiz_started:
     st.info(q.get('question', 'שאלה חסרה'))
 
     if q.get('image'):
-        st.image(q['image'], use_container_width=True)
+        import os
+
+        # בודק אם התמונה קיימת בתיקייה הנוכחית
+        image_path = q['image']
+        if os.path.exists(image_path):
+            st.image(image_path, use_container_width=True)
+        else:
+            # אם לא מצא, מנסה לחפש אותה בתיקייה הראשית של הפרויקט
+            st.warning(f"מנסה לטעון תמונה: {image_path}")
 
     user_choice = st.radio("בחר תשובה:", q.get('options', []), key=f"q_{current_num}", index=None)
 
