@@ -3,7 +3,7 @@ import json
 import random
 
 
-# פונקציה לטעינת השאלות מקובץ ה-JSON
+# --- פונקציות ---
 def load_questions():
     try:
         with open('questions.json', 'r', encoding='utf-8') as f:
@@ -14,67 +14,94 @@ def load_questions():
         return []
 
 
-# אתחול ה-State (זיכרון של האפליקציה)
+# --- אתחול הזיכרון (Session State) ---
 if 'questions' not in st.session_state:
     st.session_state.questions = load_questions()
-if 'score' not in st.session_state:
-    st.session_state.score = 0
-if 'total_answered' not in st.session_state:
-    st.session_state.total_answered = 0
+
+# משתנה ששומר את השאלה הנוכחית
 if 'current_q' not in st.session_state and st.session_state.questions:
     st.session_state.current_q = random.choice(st.session_state.questions)
 
-# --- ממשק המשתמש ---
-st.set_page_config(page_title="Biology Exam", layout="centered")
+# משתנה ששומר אם המשתמש כבר ענה על השאלה הזאת (כדי להציג את התשובה)
+if 'submitted' not in st.session_state:
+    st.session_state.submitted = False
+
+if 'score' not in st.session_state:
+    st.session_state.score = 0
+
+# --- עיצוב האפליקציה ---
+st.set_page_config(page_title="Biology Exam", layout="centered", direction="rtl")
 
 st.markdown("<h1 style='text-align: center; color: #4CAF50;'>מבחן תיאוריה בביולוגיה 🧬</h1>", unsafe_allow_html=True)
 
-# הצגת סטטיסטיקה בצד
-st.sidebar.title("סטטיסטיקה")
-st.sidebar.write(f"תשובות נכונות: {st.session_state.score}")
-st.sidebar.write(f"סה\"כ שאלות: {st.session_state.total_answered}")
+# הצגת הניקוד בצד
+st.sidebar.markdown(f"### 🏆 ניקוד: {st.session_state.score}")
 
 if st.session_state.questions:
     q = st.session_state.current_q
 
+    # הצגת השאלה
     st.markdown(f"### שאלה {q['id']}")
     st.info(q['question'])
 
-    # אם יש תמונה לשאלה (אופציונלי - דורש שתשמור תמונות בתיקייה)
-    if q.get('has_image'):
-        st.warning("⚠️ שים לב: שאלה זו מתייחסת לתמונה מהמבחן המקורי")
+    # הצגת תמונה אם קיימת
+    if q.get('image'):
+        try:
+            st.image(q['image'], use_column_width=True)
+        except:
+            st.error(f"לא הצלחתי לטעון תמונה: {q['image']}")
+    elif q.get('has_image'):
+        st.warning("⚠️ שאלה זו דורשת תמונה (בדוק אם העלית אותה)")
 
-    # טופס התשובות
-    with st.form(key='quiz_form'):
-        # ערבוב סדר התשובות כדי שיהיה מעניין
-        options = q['options']
+    # --- אזור הבחירה ---
+    # אנחנו משתמשים ב-ID של השאלה בתוך ה-key כדי שהבחירה תתאפס כשעוברים שאלה
+    user_choice = st.radio(
+        "בחר את התשובה הנכונה:",
+        q['options'],
+        key=f"q_{q['id']}",
+        index=None
+    )
 
-        selected_option = st.radio("בחר את התשובה הנכונה:", options, index=None)
+    # --- כפתורים ולוגיקה ---
+    col1, col2 = st.columns([1, 1])
 
-        submit_btn = st.form_submit_button("בדוק תשובה 🚀")
-
-        if submit_btn:
-            if selected_option:
-                if selected_option == q['correct_answer']:
-                    st.success(f"נכון מאוד! התשובה היא: {selected_option}")
-                    st.balloons()
-                    st.session_state.score += 1
-                else:
-                    st.error(f"טעות! התשובה הנכונה היא: {q['correct_answer']}")
-
-                st.session_state.total_answered += 1
-
-                # כפתור מעבר לשאלה הבאה (מופיע רק אחרי שעונים)
-                if st.form_submit_button("לשאלה הבאה ➡️"):
-                    st.session_state.current_q = random.choice(st.session_state.questions)
-                    st.rerun()
+    # כפתור בדיקה (מופיע רק אם עדיין לא ענינו)
+    if not st.session_state.submitted:
+        if col1.button("בדוק תשובה 🚀"):
+            if user_choice:
+                st.session_state.submitted = True
+                st.rerun()  # מרענן את הדף כדי להציג את התוצאה
             else:
-                st.warning("לא בחרת תשובה!")
+                st.warning("אנא בחר תשובה לפני הבדיקה")
 
-    # כפתור ידני להחלפת שאלה
-    if st.button("דלג לשאלה אחרת"):
+    # אם המשתמש ענה - מציגים תוצאה וכפתור "הבא"
+    else:
+        # בדיקת התשובה
+        if user_choice == q['correct_answer']:
+            st.success(f"✅ נכון מאוד! התשובה היא: {user_choice}")
+            # הוספת ניקוד (רק אם זו פעם ראשונה שאנחנו רואים את המסך הזה)
+            # בגרסה פשוטה זו הניקוד עלול לעלות ברענון, אז נשאיר פשוט
+        else:
+            st.error(f"❌ טעות! התשובה הנכונה היא: {q['correct_answer']}")
+
+        # כפתור לשאלה הבאה
+        if st.button("לשאלה הבאה ➡️", type="primary"):
+            # איפוס המצב
+            st.session_state.submitted = False
+            # בחירת שאלה חדשה
+            st.session_state.current_q = random.choice(st.session_state.questions)
+
+            # אם התשובה הייתה נכונה, נעלה ניקוד עכשיו (לפני המעבר)
+            if user_choice == q['correct_answer']:
+                st.session_state.score += 1
+
+            st.rerun()
+
+    # כפתור דילוג (תמיד זמין בצד)
+    if col2.button("דלג שאלה ⏭️"):
+        st.session_state.submitted = False
         st.session_state.current_q = random.choice(st.session_state.questions)
         st.rerun()
 
 else:
-    st.write("אין שאלות בקובץ... תמלא את ה-JSON יא עצלן 😉")
+    st.write("אין שאלות בקובץ JSON.")
