@@ -1,6 +1,7 @@
 import streamlit as st
 import json
 import random
+import os
 
 
 # --- פונקציות ---
@@ -28,7 +29,6 @@ st.markdown("<h1 style='text-align: center;'>🧬 הכנה למבחן בביול
 if not st.session_state.quiz_started and not st.session_state.quiz_complete:
     st.subheader("הגדרות המבחן")
     actual_max = len(st.session_state.all_data)
-    # הוספתי 3 לרשימת האופציות לבקשתך
     options_list = [3, 33, 66, 99, 132, 165, actual_max]
     valid_options = sorted(list(set([opt for opt in options_list if opt <= actual_max])))
 
@@ -36,8 +36,8 @@ if not st.session_state.quiz_started and not st.session_state.quiz_complete:
 
     if st.button("התחל מבחן 🚀"):
         st.session_state.selected_questions = random.sample(st.session_state.all_data, num_q)
-        st.session_state.total_questions_limit = num_q  # המכסה המקסימלית
-        st.session_state.current_display_idx = 1  # המונה שרץ על המסך (1 עד X)
+        st.session_state.total_questions_limit = num_q
+        st.session_state.current_display_idx = 1
         st.session_state.correct_count = 0
         st.session_state.submitted = False
         st.session_state.quiz_started = True
@@ -46,33 +46,31 @@ if not st.session_state.quiz_started and not st.session_state.quiz_complete:
 # --- שלב 1: מהלך המבחן ---
 elif st.session_state.quiz_started:
     questions = st.session_state.selected_questions
-    q = questions[0]  # תמיד לוקחים את השאלה הראשונה ברשימה הדינמית
+    q = questions[0]
 
     total_limit = st.session_state.total_questions_limit
     current_num = st.session_state.current_display_idx
+    original_id = q.get('id', '??')  # לוקח את מספר השאלה המקורי מה-JSON
 
-    st.write(f"**שאלה {current_num} מתוך {total_limit}**")
+    # תצוגת מספר שאלה במבחן + מספר שאלה מקורי
+    st.write(f"**שאלה {current_num} מתוך {total_limit}** (שאלה {original_id} במאגר)")
     st.progress(min(current_num / total_limit, 1.0))
 
     st.info(q.get('question', 'שאלה חסרה'))
 
+    # הצגת תמונה עם בדיקת נתיב לדיבאגינג
     if q.get('image'):
-        import os
-
-        # בודק אם התמונה קיימת בתיקייה הנוכחית
         image_path = q['image']
         if os.path.exists(image_path):
             st.image(image_path, use_container_width=True)
         else:
-            # אם לא מצא, מנסה לחפש אותה בתיקייה הראשית של הפרויקט
-            st.warning(f"מנסה לטעון תמונה: {image_path}")
+            st.warning(f"⚠️ קובץ תמונה לא נמצא: {image_path} (וודא שהשם ב-JSON תואם לגיטהאב)")
 
     user_choice = st.radio("בחר תשובה:", q.get('options', []), key=f"q_{current_num}", index=None)
 
     col1, col2 = st.columns(2)
 
 
-    # פונקציה לסיום שאלה/דילוג ובדיקה אם הגענו לסוף המכסה
     def move_to_next_or_finish():
         if st.session_state.current_display_idx >= total_limit:
             st.session_state.quiz_started = False
@@ -94,7 +92,6 @@ elif st.session_state.quiz_started:
                 st.warning("בחר תשובה קודם")
 
         if col2.button("דלג על השאלה ⏭️"):
-            # מוציאים את השאלה הנוכחית מהרשימה (כדי שלא תחזור במבחן הקצר)
             st.session_state.selected_questions.pop(0)
             move_to_next_or_finish()
 
@@ -103,7 +100,7 @@ elif st.session_state.quiz_started:
             st.success(f"נכון מאוד! {user_choice}")
             st.balloons()
         else:
-            st.error(f"טעות. התשובה הנכונה: {q.get('correct_answer')}")
+            st.error(f"טעות. התשובה הנכונה היא: {q.get('correct_answer')}")
 
         if st.button("המשך ➡️", type="primary"):
             st.session_state.selected_questions.pop(0)
@@ -117,7 +114,7 @@ elif st.session_state.quiz_complete:
     percent = int((score / total) * 100)
 
     st.markdown(f"<h2 style='text-align: center;'>הציון שלך: {percent}%</h2>", unsafe_allow_html=True)
-    st.write(f"ענית נכון על {score} מתוך {total} שאלות שהוצגו.")
+    st.write(f"ענית נכון על {score} מתוך {total} שאלות.")
 
     if st.button("נסה מבחן חדש 🔄"):
         st.session_state.quiz_complete = False
