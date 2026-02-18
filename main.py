@@ -29,7 +29,7 @@ st.markdown("<h1 style='text-align: center;'>🧬 הכנה למבחן בביול
 if not st.session_state.quiz_started and not st.session_state.quiz_complete:
     st.subheader("הגדרות המבחן")
     actual_max = len(st.session_state.all_data)
-    options_list = [3, 33, 66, 99, 132, 165, actual_max]
+    options_list = [3, 33, actual_max]
     valid_options = sorted(list(set([opt for opt in options_list if opt <= actual_max])))
 
     num_q = st.selectbox("כמה שאלות תרצה במבחן?", valid_options)
