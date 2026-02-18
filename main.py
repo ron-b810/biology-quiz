@@ -7,102 +7,110 @@ import random
 def load_questions():
     try:
         with open('questions.json', 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return data
-    except FileNotFoundError:
-        st.error("קובץ השאלות (questions.json) לא נמצא!")
+            return json.load(f)
+    except Exception:
         return []
 
 
 # --- אתחול הזיכרון (Session State) ---
-if 'questions' not in st.session_state:
-    st.session_state.questions = load_questions()
+if 'all_data' not in st.session_state:
+    st.session_state.all_data = load_questions()
+if 'quiz_started' not in st.session_state:
+    st.session_state.quiz_started = False
+if 'quiz_complete' not in st.session_state:
+    st.session_state.quiz_complete = False
 
-# משתנה ששומר את השאלה הנוכחית
-if 'current_q' not in st.session_state and st.session_state.questions:
-    st.session_state.current_q = random.choice(st.session_state.questions)
+# --- עיצוב ---
+st.set_page_config(page_title="מבחן ביולוגיה", layout="centered")
+st.markdown("<h1 style='text-align: center;'>🧬 הכנה למבחן בביולוגיה</h1>", unsafe_allow_html=True)
 
-# משתנה ששומר אם המשתמש כבר ענה על השאלה הזאת (כדי להציג את התשובה)
-if 'submitted' not in st.session_state:
-    st.session_state.submitted = False
+# --- שלב 0: מסך פתיחה ---
+if not st.session_state.quiz_started and not st.session_state.quiz_complete:
+    st.subheader("הגדרות המבחן")
+    actual_max = len(st.session_state.all_data)
+    # הוספתי 3 לרשימת האופציות לבקשתך
+    options_list = [3, 33, 66, 99, 132, 165, actual_max]
+    valid_options = sorted(list(set([opt for opt in options_list if opt <= actual_max])))
 
-if 'score' not in st.session_state:
-    st.session_state.score = 0
+    num_q = st.selectbox("כמה שאלות תרצה במבחן?", valid_options)
 
-# --- עיצוב האפליקציה ---
-st.set_page_config(page_title="Biology Exam", layout="centered")
-
-st.markdown("<h1 style='text-align: center; color: #4CAF50;'>מבחן תיאוריה בביולוגיה 🧬</h1>", unsafe_allow_html=True)
-
-# הצגת הניקוד בצד
-st.sidebar.markdown(f"### 🏆 ניקוד: {st.session_state.score}")
-
-if st.session_state.questions:
-    q = st.session_state.current_q
-
-    # הצגת השאלה
-    st.markdown(f"### שאלה {q['id']}")
-    st.info(q['question'])
-
-    # הצגת תמונה אם קיימת
-    if q.get('image'):
-        try:
-            st.image(q['image'], use_column_width=True)
-        except:
-            st.error(f"לא הצלחתי לטעון תמונה: {q['image']}")
-    elif q.get('has_image'):
-        st.warning("⚠️ שאלה זו דורשת תמונה (בדוק אם העלית אותה)")
-
-    # --- אזור הבחירה ---
-    # אנחנו משתמשים ב-ID של השאלה בתוך ה-key כדי שהבחירה תתאפס כשעוברים שאלה
-    user_choice = st.radio(
-        "בחר את התשובה הנכונה:",
-        q['options'],
-        key=f"q_{q['id']}",
-        index=None
-    )
-
-    # --- כפתורים ולוגיקה ---
-    col1, col2 = st.columns([1, 1])
-
-    # כפתור בדיקה (מופיע רק אם עדיין לא ענינו)
-    if not st.session_state.submitted:
-        if col1.button("בדוק תשובה 🚀"):
-            if user_choice:
-                st.session_state.submitted = True
-                st.rerun()  # מרענן את הדף כדי להציג את התוצאה
-            else:
-                st.warning("אנא בחר תשובה לפני הבדיקה")
-
-    # אם המשתמש ענה - מציגים תוצאה וכפתור "הבא"
-    else:
-        # בדיקת התשובה
-        if user_choice == q['correct_answer']:
-            st.success(f"✅ נכון מאוד! התשובה היא: {user_choice}")
-            # הוספת ניקוד (רק אם זו פעם ראשונה שאנחנו רואים את המסך הזה)
-            # בגרסה פשוטה זו הניקוד עלול לעלות ברענון, אז נשאיר פשוט
-            st.balloons() #הצגת בלונים אם התשובה נכונה
-        else:
-            st.error(f"❌ טעות! התשובה הנכונה היא: {q['correct_answer']}")
-
-        # כפתור לשאלה הבאה
-        if st.button("לשאלה הבאה ➡️", type="primary"):
-            # איפוס המצב
-            st.session_state.submitted = False
-            # בחירת שאלה חדשה
-            st.session_state.current_q = random.choice(st.session_state.questions)
-
-            # אם התשובה הייתה נכונה, נעלה ניקוד עכשיו (לפני המעבר)
-            if user_choice == q['correct_answer']:
-                st.session_state.score += 1
-
-            st.rerun()
-
-    # כפתור דילוג (תמיד זמין בצד)
-    if col2.button("דלג שאלה ⏭️"):
+    if st.button("התחל מבחן 🚀"):
+        st.session_state.selected_questions = random.sample(st.session_state.all_data, num_q)
+        st.session_state.total_questions_limit = num_q  # המכסה המקסימלית
+        st.session_state.current_display_idx = 1  # המונה שרץ על המסך (1 עד X)
+        st.session_state.correct_count = 0
         st.session_state.submitted = False
-        st.session_state.current_q = random.choice(st.session_state.questions)
+        st.session_state.quiz_started = True
         st.rerun()
 
-else:
-    st.write("אין שאלות בקובץ JSON.")
+# --- שלב 1: מהלך המבחן ---
+elif st.session_state.quiz_started:
+    questions = st.session_state.selected_questions
+    q = questions[0]  # תמיד לוקחים את השאלה הראשונה ברשימה הדינמית
+
+    total_limit = st.session_state.total_questions_limit
+    current_num = st.session_state.current_display_idx
+
+    st.write(f"**שאלה {current_num} מתוך {total_limit}**")
+    st.progress(min(current_num / total_limit, 1.0))
+
+    st.info(q.get('question', 'שאלה חסרה'))
+
+    if q.get('image'):
+        st.image(q['image'], use_container_width=True)
+
+    user_choice = st.radio("בחר תשובה:", q.get('options', []), key=f"q_{current_num}", index=None)
+
+    col1, col2 = st.columns(2)
+
+
+    # פונקציה לסיום שאלה/דילוג ובדיקה אם הגענו לסוף המכסה
+    def move_to_next_or_finish():
+        if st.session_state.current_display_idx >= total_limit:
+            st.session_state.quiz_started = False
+            st.session_state.quiz_complete = True
+        else:
+            st.session_state.current_display_idx += 1
+            st.session_state.submitted = False
+        st.rerun()
+
+
+    if not st.session_state.submitted:
+        if col1.button("בדוק תשובה ✅"):
+            if user_choice:
+                st.session_state.submitted = True
+                if user_choice == q.get('correct_answer'):
+                    st.session_state.correct_count += 1
+                st.rerun()
+            else:
+                st.warning("בחר תשובה קודם")
+
+        if col2.button("דלג על השאלה ⏭️"):
+            # מוציאים את השאלה הנוכחית מהרשימה (כדי שלא תחזור במבחן הקצר)
+            st.session_state.selected_questions.pop(0)
+            move_to_next_or_finish()
+
+    else:
+        if user_choice == q.get('correct_answer'):
+            st.success(f"נכון מאוד! {user_choice}")
+            st.balloons()
+        else:
+            st.error(f"טעות. התשובה הנכונה: {q.get('correct_answer')}")
+
+        if st.button("המשך ➡️", type="primary"):
+            st.session_state.selected_questions.pop(0)
+            move_to_next_or_finish()
+
+# --- שלב 2: סיום ---
+elif st.session_state.quiz_complete:
+    st.balloons()
+    score = st.session_state.correct_count
+    total = st.session_state.total_questions_limit
+    percent = int((score / total) * 100)
+
+    st.markdown(f"<h2 style='text-align: center;'>הציון שלך: {percent}%</h2>", unsafe_allow_html=True)
+    st.write(f"ענית נכון על {score} מתוך {total} שאלות שהוצגו.")
+
+    if st.button("נסה מבחן חדש 🔄"):
+        st.session_state.quiz_complete = False
+        st.rerun()
